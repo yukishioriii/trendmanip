@@ -165,7 +165,7 @@ def create_account():
 
     except Exception as e:
         print(f'Error {e}. wac...')
-        # time.sleep(120)
+        time.sleep(300)
         create_account()
     finally:
         if driver:
@@ -176,3 +176,4 @@ def create_account():
 
 for i in range(20):
     create_account()
+    time.sleep(300)
