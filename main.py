@@ -19,8 +19,9 @@ with open("cred.json", "r") as f:
 def generate_user():
     with open("names.txt", "r") as f:
         names = f.read().splitlines()
-        username = f"{choice(names)}_{choice(names)}_{randint(1, 10000)}"
-        password = ''.join(choice(string.ascii_letters+string.digits) for i in range(randint(10, 20)))
+        username = f"{choice(names)}_{choice(names)}_{randint(1, 10000)}"[:20]
+        password = ''.join(choice(string.ascii_letters+string.digits)
+                           for i in range(randint(10, 20)))
         return username, password
 
 
@@ -61,9 +62,11 @@ def captcha_get_res(task_id):
     if res_body["status"] == "ready":
         solution = res_body["solution"]["gRecaptchaResponse"]
         return solution
-    if (res_body["errorId"] == 1 or res_body["status"] != "ready"):
-        print("cucked, waiting again")
-        time.sleep(10)
+    retry = 0
+    if retry < 3 and (res_body["errorId"] == 1 or res_body["status"] != "ready"):
+        retry += 1
+        print(f"cucked, waiting again, attempt: {retry}")
+        time.sleep(30)
         res = requests.post(url, json=body)
         res_body = res.json()
         print(res_body)
@@ -91,26 +94,37 @@ def solving_captcha(driver):
     token = captcha_get_res(task_id)
     # print('Answer token recieved: ' + token)
     captchaInput = driver.find_element(By.ID, 'g-recaptcha-response')
-    driver.execute_script("arguments[0].setAttribute('style','visibility:visible;');", captchaInput)
+    driver.execute_script(
+        "arguments[0].setAttribute('style','visibility:visible;');", captchaInput)
     captchaInput.send_keys(token)
     # print('Submitting token')
-    driver.find_element(By.XPATH, '/html/body/div[3]/div/div/div[1]/form/div[8]/button').click()
+    driver.find_element(
+        By.XPATH, '/html/body/div[3]/div/div/div[1]/form/div[8]/button').click()
 
 
 def checking_email(email_driver):
     print('Checking email...')
-    email_driver.find_element(
-        By.XPATH,
-        '/html/body/div[1]/div/div/div/div[2]/div/div[1]/div/div/div[1]/div[2]/table/tbody/tr/td[1]/a').click()
-    frame = email_driver.find_element(By.ID, 'the_message_iframe')
-    email_driver.switch_to.frame(frame)
-    email_driver.find_element(
-        By.XPATH, '/html/body/center/table/tbody/tr/td/table/tbody/tr/td/table/tbody/tr[1]/td/table/tbody/tr/td/table/tbody/tr/td/table/tbody/tr[3]/td/table/tbody/tr/td/a').click()
+    retry = 0
+    while retry < 3:
+        try:
+            retry += 1
+            time.sleep(30)
+            email_driver.find_element(
+                By.XPATH,
+                '/html/body/div[1]/div/div/div/div[2]/div/div[1]/div/div/div[1]/div[2]/table/tbody/tr/td[1]/a').click()
+            frame = email_driver.find_element(By.ID, 'the_message_iframe')
+            email_driver.switch_to.frame(frame)
+            email_driver.find_element(
+                By.XPATH, '/html/body/center/table/tbody/tr/td/table/tbody/tr/td/table/tbody/tr[1]/td/table/tbody/tr/td/table/tbody/tr/td/table/tbody/tr[3]/td/table/tbody/tr/td/a').click()
 
-    next_handle = [handle for handle in email_driver.window_handles
-                   if handle != email_driver.current_window_handle][0]
-    email_driver.switch_to.window(next_handle)
-    email_driver.find_element(By.XPATH, "/html/body/div[3]/div[1]/form/button").click()
+            next_handle = [handle for handle in email_driver.window_handles
+                           if handle != email_driver.current_window_handle][0]
+            email_driver.switch_to.window(next_handle)
+            email_driver.find_element(
+                By.XPATH, "/html/body/div[3]/div[1]/form/button").click()
+            return email_driver
+        except Exception as e:
+            print(e)
 
 
 def create_account():
@@ -118,7 +132,8 @@ def create_account():
         driver = webdriver.Chrome()
 
         username, password = generate_user()
-        print('Creating account with username: ' + username + ' and password: ' + password + '...')
+        print('Creating account with username: ' +
+              username + ' and password: ' + password + '...')
 
         driver.delete_all_cookies()
 
@@ -143,7 +158,7 @@ def create_account():
         driver.find_element(By.ID, 'email_reg').send_keys(email)
 
         solving_captcha(driver)
-        time.sleep(30)
+        time.sleep(5)
         checking_email(email_driver)
 
         with open("accounts.txt", "a") as f:
@@ -153,7 +168,7 @@ def create_account():
     except Exception as e:
         print(f'Error {e}. wac...')
         # time.sleep(120)
-        create_account()
+        raise e
     finally:
         if driver:
             driver.close()
@@ -161,5 +176,6 @@ def create_account():
             email_driver.close()
 
 
-for i in range(20):
+for i in range(50):
     create_account()
+    time.sleep(300)
